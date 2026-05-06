@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WavePresetId } from "@/lib/wavePhysics";
 import { PRESETS, cabsSq, findPreset } from "@/lib/wavePhysics";
+import { EquationExplainer } from "./EquationExplainer";
 import { MathBlock } from "./MathBlock";
 
 const CANVAS_W = 900;
@@ -193,6 +194,8 @@ export function WaveLab() {
         </label>
         <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{preset.blurb}</p>
         <MathBlock key={preset.latex} latex={preset.latex} />
+
+        <EquationExplainer preset={preset} />
 
         <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
           <button

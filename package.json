@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "ai": "^6.0.175",
     "katex": "^0.16.45",
     "next": "16.2.4",
     "react": "19.2.4",
