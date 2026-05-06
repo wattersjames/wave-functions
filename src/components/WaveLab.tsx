@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { WavePresetId } from "@/lib/wavePhysics";
 import { PRESETS, cabsSq, findPreset } from "@/lib/wavePhysics";
 import { EquationExplainer } from "./EquationExplainer";
@@ -125,8 +125,10 @@ export function WaveLab() {
 
   const preset = findPreset(presetId);
 
-  const loop = useCallback(
-    (now: number) => {
+  useEffect(() => {
+    let frameId: number | null = null;
+
+    function loop(now: number) {
       if (lastRef.current != null) {
         const dt = (now - lastRef.current) / 1000;
         if (playing) timeRef.current += dt * speed;
@@ -139,17 +141,18 @@ export function WaveLab() {
         const ctx = canvas.getContext("2d");
         if (ctx) drawFrame(ctx, dpr, presetId, timeRef.current);
       }
-      rafRef.current = requestAnimationFrame(loop);
-    },
-    [playing, speed, presetId],
-  );
+      frameId = requestAnimationFrame(loop);
+      rafRef.current = frameId;
+    }
 
-  useEffect(() => {
-    rafRef.current = requestAnimationFrame(loop);
+    frameId = requestAnimationFrame(loop);
+    rafRef.current = frameId;
+
     return () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      if (frameId != null) cancelAnimationFrame(frameId);
+      if (rafRef.current === frameId) rafRef.current = null;
     };
-  }, [loop]);
+  }, [playing, speed, presetId]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -245,7 +248,7 @@ export function WaveLab() {
         </div>
       </div>
 
-      <EquationExplainer preset={preset} explainSignal={explainSignal} />
+      <EquationExplainer key={preset.id} preset={preset} explainSignal={explainSignal} />
     </div>
   );
 }
