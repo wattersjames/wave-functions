@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { WavePresetId } from "@/lib/wavePhysics";
 import { PRESETS, cabsSq, findPreset } from "@/lib/wavePhysics";
 import { EquationExplainer } from "./EquationExplainer";
@@ -39,9 +39,33 @@ function drawFrame(
   const colRe = isDark ? "#38bdf8" : "#0284c7";
   const colIm = isDark ? "#fb923c" : "#c2410c";
   const colProb = isDark ? "rgba(167, 139, 250, 0.35)" : "rgba(124, 58, 237, 0.25)";
+  const colBarrier = isDark ? "rgba(250, 204, 21, 0.16)" : "rgba(202, 138, 4, 0.16)";
+  const colBarrierEdge = isDark ? "rgba(250, 204, 21, 0.55)" : "rgba(161, 98, 7, 0.45)";
 
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  if (preset.barriers?.length) {
+    for (const barrier of preset.barriers) {
+      const x0 = PAD_L + barrier.start * plotW;
+      const w = (barrier.end - barrier.start) * plotW;
+      ctx.fillStyle = colBarrier;
+      ctx.fillRect(x0, PAD_T, w, plotH);
+      ctx.strokeStyle = colBarrierEdge;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(x0, PAD_T);
+      ctx.lineTo(x0, PAD_T + plotH);
+      ctx.moveTo(x0 + w, PAD_T);
+      ctx.lineTo(x0 + w, PAD_T + plotH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = text;
+      ctx.font = "12px var(--font-geist-sans), system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(barrier.label, x0 + w / 2, PAD_T + 14);
+    }
+  }
 
   ctx.strokeStyle = grid;
   ctx.lineWidth = 1;
@@ -125,8 +149,10 @@ export function WaveLab() {
 
   const preset = findPreset(presetId);
 
-  const loop = useCallback(
-    (now: number) => {
+  useEffect(() => {
+    let frameId: number | null = null;
+
+    function loop(now: number) {
       if (lastRef.current != null) {
         const dt = (now - lastRef.current) / 1000;
         if (playing) timeRef.current += dt * speed;
@@ -139,17 +165,18 @@ export function WaveLab() {
         const ctx = canvas.getContext("2d");
         if (ctx) drawFrame(ctx, dpr, presetId, timeRef.current);
       }
-      rafRef.current = requestAnimationFrame(loop);
-    },
-    [playing, speed, presetId],
-  );
+      frameId = requestAnimationFrame(loop);
+      rafRef.current = frameId;
+    }
 
-  useEffect(() => {
-    rafRef.current = requestAnimationFrame(loop);
+    frameId = requestAnimationFrame(loop);
+    rafRef.current = frameId;
+
     return () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      if (frameId != null) cancelAnimationFrame(frameId);
+      if (rafRef.current === frameId) rafRef.current = null;
     };
-  }, [loop]);
+  }, [playing, speed, presetId]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -169,8 +196,9 @@ export function WaveLab() {
         </h1>
         <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
           Quantum-style examples on a normalized interval: real part (blue), imaginary part
-          (orange), and filled |ψ|² (violet, scaled to peak each frame). Time uses scaled units
-          E₁ = ℏ = 1 for the well examples.
+          (orange), and filled |ψ|² (violet, scaled to peak each frame). Shaded gold regions
+          mark potential barriers when a preset includes one. Time uses scaled units E₁ = ℏ = 1
+          for the well examples.
         </p>
       </header>
 
@@ -242,10 +270,16 @@ export function WaveLab() {
           <span className="flex items-center gap-2">
             <span className="inline-block h-3 w-6 rounded-sm bg-violet-500/40" /> |ψ|² (area)
           </span>
+          {preset.barriers?.length ? (
+            <span className="flex items-center gap-2">
+              <span className="inline-block h-3 w-6 rounded-sm bg-yellow-500/20 ring-1 ring-yellow-600/40" />
+              potential barrier
+            </span>
+          ) : null}
         </div>
       </div>
 
-      <EquationExplainer preset={preset} explainSignal={explainSignal} />
+      <EquationExplainer key={preset.id} preset={preset} explainSignal={explainSignal} />
     </div>
   );
 }

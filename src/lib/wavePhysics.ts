@@ -22,6 +22,12 @@ export const cmExpNegI = (theta: number): C => ({
   im: -Math.sin(theta),
 });
 
+/** exp(i θ) = cos θ + i sin θ */
+export const cmExpI = (theta: number): C => ({
+  re: Math.cos(theta),
+  im: Math.sin(theta),
+});
+
 export const cabsSq = (a: C): number => a.re * a.re + a.im * a.im;
 
 export const creal = (a: C): C => ({ re: a.re, im: 0 });
@@ -37,8 +43,15 @@ export type WavePresetId =
   | "box-n1"
   | "box-n2"
   | "superpose-12"
+  | "tunneling"
   | "traveling"
   | "standing";
+
+export type PotentialBarrier = {
+  start: number;
+  end: number;
+  label: string;
+};
 
 export type WavePreset = {
   id: WavePresetId;
@@ -46,9 +59,39 @@ export type WavePreset = {
   blurb: string;
   /** KaTeX math (display mode) */
   latex: string;
+  /** Regions to shade as potential barriers in the plot. */
+  barriers?: PotentialBarrier[];
   /** x in [0,1] on the well / domain; t is dimensionless evolution time */
   psi: (x: number, t: number) => C;
 };
+
+const TUNNEL_BARRIER = { start: 0.44, end: 0.58, label: "V₀" } as const;
+
+function tunnelingWave(x: number, t: number): C {
+  const k = 20 * Math.PI;
+  const omega = 5;
+  const reflected = 0.45;
+  const barrierDecay = 11;
+  const barrierWidth = TUNNEL_BARRIER.end - TUNNEL_BARRIER.start;
+  const transmitted = Math.exp(-barrierDecay * barrierWidth);
+
+  if (x < TUNNEL_BARRIER.start) {
+    const incident = cmExpI(k * x);
+    const reflectedWave = cscale(reflected, cmExpI(-k * x + 0.7));
+    return cmul(cadd(incident, reflectedWave), cmExpNegI(omega * t));
+  }
+
+  if (x <= TUNNEL_BARRIER.end) {
+    const depth = x - TUNNEL_BARRIER.start;
+    const envelope = Math.exp(-barrierDecay * depth);
+    const phase = k * TUNNEL_BARRIER.start - 0.4 * k * depth;
+    return cmul(cscale(envelope, cmExpI(phase)), cmExpNegI(omega * t));
+  }
+
+  const phaseAtExit = k * TUNNEL_BARRIER.start - 0.4 * k * barrierWidth;
+  const phase = phaseAtExit + k * (x - TUNNEL_BARRIER.end);
+  return cmul(cscale(transmitted, cmExpI(phase)), cmExpNegI(omega * t));
+}
 
 /**
  * Energy units: E_n = n² (so E₁ = 1). Time t multiplies E/ℏ in the phase exp(−i E t / ℏ).
@@ -81,6 +124,15 @@ export const PRESETS: WavePreset[] = [
       const inv = 1 / Math.sqrt(2);
       return cadd(cscale(inv, p1), cscale(inv, p2));
     },
+  },
+  {
+    id: "tunneling",
+    label: "Quantum tunneling barrier",
+    blurb:
+      "Toy scattering state: an incoming matter wave partly reflects, decays inside a finite barrier, and emerges with a smaller transmitted amplitude.",
+    latex: String.raw`\psi(x,t)\sim \begin{cases}e^{i kx}+r e^{-i kx},&x<a\\ e^{-\kappa(x-a)},&a\le x\le b\\ T e^{i k(x-b)},&x>b\end{cases}e^{-i\omega t},\quad E<V_0`,
+    barriers: [TUNNEL_BARRIER],
+    psi: tunnelingWave,
   },
   {
     id: "traveling",

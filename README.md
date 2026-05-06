@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Wave functions
 
-## Getting Started
+An interactive Next.js + TypeScript teaching app for visualizing simple wave functions on a normalized interval `x ∈ [0, 1]`.
 
-First, run the development server:
+The canvas shows:
+
+- **Blue**: real component `Re ψ`
+- **Orange**: imaginary component `Im ψ`
+- **Violet fill**: peak-normalized `|ψ|²`
+- **Gold shading**: finite potential barriers, currently used by the tunneling preset
+
+The presets include infinite-well stationary states, a superposition, classical comparison waves, and a toy quantum tunneling barrier where the wave decays inside the barrier but has a transmitted tail. The app also includes an AI tutor endpoint that explains the selected preset and answers follow-up questions.
+
+## Tech stack
+
+- Next.js 16 App Router
+- React 19
+- TypeScript strict mode
+- Tailwind CSS 4
+- KaTeX + react-markdown for math explanations
+- Vercel AI SDK / AI Gateway model routing
+- Node's built-in `node:test` runner for unit tests
+
+## Getting started
+
+Install dependencies:
+
+```bash
+npm ci
+```
+
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open <http://localhost:3000> in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## AI tutor configuration
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The tutor API route defaults to `openai/gpt-5.4` and can be overridden with:
 
-## Learn More
+```bash
+AI_EXPLAIN_MODEL=openai/gpt-5.4
+```
 
-To learn more about Next.js, take a look at the following resources:
+The route expects `application/json` requests and includes guardrails for:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Known preset IDs only
+- Maximum request body size
+- Maximum message count and character budgets
+- Basic in-memory per-client rate limiting
+- Generic client-facing provider error messages
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Available scripts
 
-## Deploy on Vercel
+```bash
+npm run dev        # Start local development server
+npm run build      # Create a production build
+npm run start      # Start the production server after building
+npm run lint       # Run ESLint
+npm run typecheck  # Run TypeScript without emitting files
+npm run test       # Run unit tests with node:test
+npm run check      # Run lint, typecheck, tests, and build
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Project layout
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+src/app/                 Next.js App Router routes and global styles
+src/app/api/explain/     Streaming AI tutor route
+src/components/          Interactive visualization and tutor UI
+src/lib/                 Physics, prompt, and request-validation helpers
+tests/                   Unit tests for physics and API request helpers
+```
+
+## Notes for contributors
+
+- Keep wave math deterministic and side-effect-free so it remains easy to unit test.
+- Keep AI request validation outside the route when possible; `src/lib/explainRequest.ts` is covered by unit tests.
+- The project avoids `next/font/google` so production builds do not need to fetch Google Fonts at build time.
+- Run `npm run check` before opening a pull request.
