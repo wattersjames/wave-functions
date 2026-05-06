@@ -88,7 +88,41 @@ export async function POST(req: Request) {
         tags: ["wave-functions:explain", `preset:${preset.id}`],
       },
     },
+    onError: ({ error }) => {
+      console.error("[/api/explain] streamText error:", error);
+    },
   });
 
-  return result.toTextStreamResponse();
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        for await (const part of result.fullStream) {
+          if (part.type === "text-delta") {
+            controller.enqueue(encoder.encode(part.text));
+          } else if (part.type === "error") {
+            const e = part.error;
+            const msg =
+              e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+            console.error("[/api/explain] gateway error part:", e);
+            controller.enqueue(encoder.encode(`\n\n⚠️ AI Gateway error — ${msg}`));
+          }
+        }
+      } catch (err) {
+        const msg =
+          err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+        console.error("[/api/explain] stream exception:", err);
+        controller.enqueue(encoder.encode(`\n\n⚠️ Stream exception — ${msg}`));
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
 }
