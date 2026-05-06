@@ -118,6 +118,7 @@ export function WaveLab() {
   const [presetId, setPresetId] = useState<WavePresetId>("superpose-12");
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(1);
+  const [explainSignal, setExplainSignal] = useState(0);
   const timeRef = useRef(0);
   const rafRef = useRef<number | null>(null);
   const lastRef = useRef<number | null>(null);
@@ -195,7 +196,15 @@ export function WaveLab() {
         <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{preset.blurb}</p>
         <MathBlock key={preset.latex} latex={preset.latex} />
 
-        <EquationExplainer preset={preset} />
+        <div className="flex justify-center sm:justify-start">
+          <button
+            type="button"
+            onClick={() => setExplainSignal((n) => n + 1)}
+            className="rounded-full bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-violet-500"
+          >
+            Explain to me
+          </button>
+        </div>
 
         <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
           <button
@@ -235,6 +244,8 @@ export function WaveLab() {
           </span>
         </div>
       </div>
+
+      <EquationExplainer preset={preset} explainSignal={explainSignal} />
     </div>
   );
 }
