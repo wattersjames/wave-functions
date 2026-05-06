@@ -35,11 +35,14 @@ export function EquationExplainer({ preset, explainSignal }: Props) {
   const lastSignalRef = useRef(0);
 
   useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-      abortRef.current = null;
-    };
-  }, []);
+    setMessages([]);
+    setDraft("");
+    setFollowUp("");
+    setError(null);
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setLoading(false);
+  }, [preset.id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -154,13 +157,8 @@ export function EquationExplainer({ preset, explainSignal }: Props) {
     if (explainSignal === lastSignalRef.current) return;
     lastSignalRef.current = explainSignal;
     if (explainSignal === 0) return;
-
-    const id = window.setTimeout(() => {
-      setOpen(true);
-      void handleExplainInitial();
-    }, 0);
-
-    return () => window.clearTimeout(id);
+    setOpen(true);
+    void handleExplainInitial();
     // We intentionally only react to explainSignal changes; preset is read live.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [explainSignal]);

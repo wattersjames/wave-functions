@@ -65,6 +65,7 @@ export type WavePreset = {
   psi: (x: number, t: number) => C;
 };
 
+
 const TUNNEL_BARRIER = { start: 0.44, end: 0.58, label: "V₀" } as const;
 
 function tunnelingWave(x: number, t: number): C {

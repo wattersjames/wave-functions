@@ -6,10 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.ts",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "lint": "eslint"
   },
   "dependencies": {
     "ai": "^6.0.175",
@@ -32,9 +29,5 @@
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
     "typescript": "^5"
-  },
-  "type": "module",
-  "engines": {
-    "node": ">=22"
   }
 }

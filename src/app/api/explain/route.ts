@@ -3,39 +3,59 @@ import {
   WAVE_EXPLAIN_SYSTEM,
   buildInitialExplainerUserContent,
 } from "@/lib/explainPrompts";
-import { PRESETS, findPreset, type WavePresetId } from "@/lib/wavePhysics";
 import {
-  getClientKey,
-  isRateLimited,
-  jsonError,
-  readJsonBody,
-  toModelMessages,
-} from "@/lib/explainRequest";
+  PRESETS,
+  findPreset,
+  type WavePresetId,
+} from "@/lib/wavePhysics";
 
 export const maxDuration = 60;
 
-export const DEFAULT_MODEL = "openai/gpt-5.4";
-const MODEL = process.env.AI_EXPLAIN_MODEL ?? DEFAULT_MODEL;
+const MODEL = "openai/gpt-5.4";
+
+type ChatBody = {
+  presetId?: string;
+  initial?: boolean;
+  messages?: { role: string; content: string }[];
+};
 
 const VALID_PRESET_IDS = new Set<string>(PRESETS.map((p) => p.id));
-const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 
 function isWavePresetId(id: string): id is WavePresetId {
   return VALID_PRESET_IDS.has(id);
 }
 
-export async function POST(req: Request) {
-  if (isRateLimited(requestBuckets, getClientKey(req))) {
-    return jsonError("Too many tutor requests. Please wait a minute and try again.", 429);
+function toModelMessages(
+  raw: { role: string; content: string }[] | undefined,
+): ModelMessage[] | null {
+  if (!raw?.length) return null;
+  const out: ModelMessage[] = [];
+  for (const m of raw) {
+    if (m.role !== "user" && m.role !== "assistant") continue;
+    const c = typeof m.content === "string" ? m.content : "";
+    if (c.length > 16_000) return null;
+    out.push({ role: m.role, content: c });
   }
+  return out.length ? out : null;
+}
 
-  const parsedBody = await readJsonBody(req);
-  if (parsedBody instanceof Response) return parsedBody;
-  const body = parsedBody;
+export async function POST(req: Request) {
+  let body: ChatBody;
+  try {
+    body = (await req.json()) as ChatBody;
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: { "content-type": "application/json" },
+    });
+  }
 
   const presetIdRaw = body.presetId;
   if (!presetIdRaw || !isWavePresetId(presetIdRaw)) {
-    return jsonError("Unknown or missing presetId", 400);
+    return new Response(JSON.stringify({ error: "Unknown or missing presetId" }), {
+      status: 400,
+      headers: { "content-type": "application/json" },
+    });
   }
 
   const preset = findPreset(presetIdRaw);
@@ -51,7 +71,10 @@ export async function POST(req: Request) {
   } else {
     const parsed = toModelMessages(body.messages);
     if (!parsed) {
-      return jsonError("Provide initial: true or a valid non-empty messages array", 400);
+      return new Response(
+        JSON.stringify({ error: "Provide initial: true or a non-empty messages array" }),
+        { status: 400, headers: { "content-type": "application/json" } },
+      );
     }
     messages = parsed;
   }
@@ -78,21 +101,18 @@ export async function POST(req: Request) {
           if (part.type === "text-delta") {
             controller.enqueue(encoder.encode(part.text));
           } else if (part.type === "error") {
-            console.error("[/api/explain] gateway error part:", part.error);
-            controller.enqueue(
-              encoder.encode(
-                "\n\n⚠️ The tutor hit a provider error. Please retry in a moment.",
-              ),
-            );
+            const e = part.error;
+            const msg =
+              e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+            console.error("[/api/explain] gateway error part:", e);
+            controller.enqueue(encoder.encode(`\n\n⚠️ AI Gateway error — ${msg}`));
           }
         }
       } catch (err) {
+        const msg =
+          err instanceof Error ? `${err.name}: ${err.message}` : String(err);
         console.error("[/api/explain] stream exception:", err);
-        controller.enqueue(
-          encoder.encode(
-            "\n\n⚠️ The tutor stream ended unexpectedly. Please retry in a moment.",
-          ),
-        );
+        controller.enqueue(encoder.encode(`\n\n⚠️ Stream exception — ${msg}`));
       } finally {
         controller.close();
       }
